@@ -25,3 +25,36 @@ dnf5 install -y tmux
 #### Example for enabling a System Unit File
 
 systemctl enable podman.socket
+
+### ABR: roll over to official Bazzite after the owner finishes setup
+
+cat > /usr/libexec/abr-rollover <<'EOF'
+#!/usr/bin/bash
+set -euo pipefail
+# Wait until the internet works
+until curl -s -o /dev/null --max-time 10 https://ghcr.io; do sleep 30; done
+rpm-ostree rebase ostree-image-signed:docker://ghcr.io/ublue-os/bazzite-nvidia:stable
+mkdir -p /var/lib/abr
+touch /var/lib/abr/rollover-done
+EOF
+chmod +x /usr/libexec/abr-rollover
+
+cat > /usr/lib/systemd/system/abr-rollover.service <<'EOF'
+[Unit]
+Description=ABR: switch to official Bazzite after owner setup
+ConditionPathExists=/etc/plasma-setup-done
+ConditionPathExists=!/var/lib/abr/rollover-done
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/abr-rollover
+Restart=on-failure
+RestartSec=5min
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable abr-rollover.service
