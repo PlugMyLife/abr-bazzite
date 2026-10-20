@@ -43,6 +43,7 @@ TARGET="${1:?usage: sudo abr-arm <username-to-delete>}"
 id "$TARGET" >/dev/null
 systemctl enable plasma-setup.service
 rm -f /etc/plasma-setup-done
+rm -f /var/lib/abr/rollover-done
 echo "Armed. Logging out and deleting $TARGET, then powering off..."
 systemd-run --unit=abr-arm-finish bash -c "loginctl terminate-user $TARGET; sleep 3; userdel -rf $TARGET; id $TARGET || poweroff"
 EOF
@@ -55,9 +56,14 @@ cat > /usr/libexec/abr-rollover <<'EOF'
 set -euo pipefail
 
 # 1. Remove the Fedora theme plasma-setup assigns, so Bazzite's default applies
-for f in /var/home/*/.config/kdeglobals; do
+for home in /var/home/*/; do
+  f="${home}.config/kdeglobals"
   if [ -f "$f" ]; then
     sed -i '/^LookAndFeelPackage=org\.fedoraproject\./d' "$f"
+  fi
+  d="${home}.config/kdedefaults"
+  if grep -qs fedoraproject "$d/package"; then
+    rm -rf "$d"
   fi
 done
 
