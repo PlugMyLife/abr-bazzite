@@ -31,7 +31,7 @@ The image adds three things to stock Bazzite:
 1. Power on → **Welcome to Plasma Desktop → Begin Setup**. They create their own account.
 2. They log in. In the background, the machine immediately starts switching to official Bazzite.
 3. A few minutes later, a notification appears: **"Almost done! Restart your computer to finish setting up."** with a **Restart now** button.
-4. After restarting, they're on official Bazzite with Bazzite's default theme and wallpaper.
+4. After restarting, they're on official Bazzite.
 
 ---
 
