@@ -30,6 +30,12 @@ systemctl enable podman.socket
 dnf5 install -y --setopt=install_weak_deps=False plasma-setup libnotify
 systemctl disable plasma-setup.service
 
+### ABR: make the setup wizard use Bazzite's theme instead of Fedora's
+KDE_PROFILE=/usr/share/kde-settings/kde-profile/default/xdg/kdeglobals
+if [ -f "$KDE_PROFILE" ]; then
+  sed -i 's/^LookAndFeelPackage=.*/LookAndFeelPackage=com.valve.vapor.desktop/' "$KDE_PROFILE"
+fi
+
 cat > /usr/bin/abr-arm <<'EOF'
 #!/usr/bin/bash
 set -euo pipefail
