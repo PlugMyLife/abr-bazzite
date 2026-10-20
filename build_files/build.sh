@@ -26,6 +26,9 @@ dnf5 install -y tmux
 
 systemctl enable podman.socket
 
+### ABR: install KDE's first-boot setup wizard
+dnf5 install -y plasma-setup
+
 ### ABR: roll over to official Bazzite after the owner finishes setup
 
 cat > /usr/libexec/abr-rollover <<'EOF'
