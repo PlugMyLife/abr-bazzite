@@ -27,7 +27,7 @@ dnf5 install -y tmux
 systemctl enable podman.socket
 
 ### ABR: install KDE's first-boot setup wizard
-dnf5 install -y --setopt=install_weak_deps=False plasma-setup
+dnf5 install -y --setopt=install_weak_deps=False plasma-setup libnotify
 systemctl disable plasma-setup.service
 
 cat > /usr/bin/abr-arm <<'EOF'
@@ -42,16 +42,33 @@ systemd-run --unit=abr-arm-finish bash -c "loginctl terminate-user $TARGET; slee
 EOF
 chmod +x /usr/bin/abr-arm
 
-### ABR: roll over to official Bazzite after the owner finishes setup
+### ABR: roll over to official Bazzite as soon as the owner finishes setup
 
 cat > /usr/libexec/abr-rollover <<'EOF'
 #!/usr/bin/bash
 set -euo pipefail
-# Wait until the internet works
+
+# 1. Remove the Fedora theme plasma-setup assigns, so Bazzite's default applies
+for f in /var/home/*/.config/kdeglobals; do
+  if [ -f "$f" ]; then
+    sed -i '/^LookAndFeelPackage=org\.fedoraproject\./d' "$f"
+  fi
+done
+
+# 2. Wait for internet, then stage official Bazzite
 until curl -s -o /dev/null --max-time 10 https://ghcr.io; do sleep 30; done
 rpm-ostree rebase ostree-image-signed:docker://ghcr.io/ublue-os/bazzite-nvidia:stable
 mkdir -p /var/lib/abr
 touch /var/lib/abr/rollover-done
+
+# 3. Wait for the owner to be logged in, then ask them to restart
+until ls -d /run/user/1[0-9][0-9][0-9] >/dev/null 2>&1; do sleep 10; done
+uid_dir=$(ls -d /run/user/1[0-9][0-9][0-9] | head -n1)
+user=$(id -nu "${uid_dir##*/}")
+choice=$(runuser -u "$user" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=$uid_dir/bus" \
+  notify-send --wait -u critical -a "Computer setup" -A restart="Restart now" \
+  "Almost done!" "Restart your computer to finish setting up." || true)
+if [ "$choice" = "restart" ]; then systemctl reboot; fi
 EOF
 chmod +x /usr/libexec/abr-rollover
 
@@ -71,4 +88,15 @@ RestartSec=5min
 WantedBy=multi-user.target
 EOF
 
-systemctl enable abr-rollover.service
+cat > /usr/lib/systemd/system/abr-rollover.path <<'EOF'
+[Unit]
+Description=ABR: start the rollover as soon as owner setup finishes
+
+[Path]
+PathChanged=/etc/plasma-setup-done
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl enable abr-rollover.service abr-rollover.path
