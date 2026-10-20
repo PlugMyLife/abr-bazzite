@@ -27,7 +27,20 @@ dnf5 install -y tmux
 systemctl enable podman.socket
 
 ### ABR: install KDE's first-boot setup wizard
-dnf5 install -y plasma-setup
+dnf5 install -y --setopt=install_weak_deps=False plasma-setup
+systemctl disable plasma-setup.service
+
+cat > /usr/bin/abr-arm <<'EOF'
+#!/usr/bin/bash
+set -euo pipefail
+TARGET="${1:?usage: sudo abr-arm <username-to-delete>}"
+id "$TARGET" >/dev/null
+systemctl enable plasma-setup.service
+rm -f /etc/plasma-setup-done
+echo "Armed. Logging out and deleting $TARGET, then powering off..."
+systemd-run --unit=abr-arm-finish bash -c "loginctl terminate-user $TARGET; sleep 3; userdel -rf $TARGET; id $TARGET || poweroff"
+EOF
+chmod +x /usr/bin/abr-arm
 
 ### ABR: roll over to official Bazzite after the owner finishes setup
 
@@ -47,11 +60,9 @@ cat > /usr/lib/systemd/system/abr-rollover.service <<'EOF'
 Description=ABR: switch to official Bazzite after owner setup
 ConditionPathExists=/etc/plasma-setup-done
 ConditionPathExists=!/var/lib/abr/rollover-done
-Wants=network-online.target
-After=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/libexec/abr-rollover
 Restart=on-failure
 RestartSec=5min
